@@ -1,0 +1,110 @@
+scalar DateTime
+
+# User roles in the company hierarchy
+enum UserRole {
+  EMPLOYEE    # Regular staff member
+  MANAGER     # Team lead with analytics access
+  HR          # HR staff with org-wide visibility
+  ADMIN       # Full system access
+}
+
+# Who can see a recognition
+enum Visibility {
+  PUBLIC      # Everyone in the company can see this
+  PRIVATE     # Only sender and recipient can see
+  ANONYMOUS   # Recipient sees message but not who sent it
+}
+
+type User {
+  id: ID!
+  email: String!               # Used for login
+  name: String!                # Display name
+  role: UserRole!
+  team: Team                   # Can be null if no team assigned
+  createdAt: DateTime!
+}
+
+type Team {
+  id: ID!
+  name: String!
+  description: String
+  members: [User!]!
+  createdAt: DateTime!
+}
+
+type Recognition {
+  id: ID!
+  message: String!             # The actual recognition text
+  visibility: Visibility!
+  sender: User                 # Null if anonymous
+  recipient: User!
+  keywords: [String!]!         # Auto-extracted for analytics
+  createdAt: DateTime!
+}
+
+# Team performance metrics for managers
+type TeamStats {
+  teamId: ID!
+  totalCount: Int!
+  publicCount: Int!
+  privateCount: Int!
+  anonymousCount: Int!
+  topKeywords: [String!]!      # Most common recognition themes
+}
+
+# Login response with JWT token
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+input CreateRecognitionInput {
+  recipientId: ID!
+  message: String!             # 1-500 characters
+  visibility: Visibility!
+}
+
+type Query {
+  # Get my own profile
+  me: User
+  
+  # Look up any user in the company
+  user(id: ID!): User
+  
+  # Browse company directory
+  users(limit: Int = 20): [User!]!
+  
+  # Get recognitions I can see (public + my private ones)
+  recognitions(
+    limit: Int = 20
+    visibility: Visibility
+  ): [Recognition!]!
+  
+  # Get recognitions I sent or received
+  myRecognitions(
+    type: String              # "sent" or "received"
+    limit: Int = 20
+  ): [Recognition!]!
+  
+  # Get a specific recognition by ID
+  recognition(id: ID!): Recognition
+  
+  # Team analytics (managers only)
+  teamStats(teamId: ID!): TeamStats
+}
+
+type Mutation {
+  # Login with email (simplified for MVP)
+  login(email: String!): AuthPayload!
+  
+  # Send recognition to a coworker
+  createRecognition(input: CreateRecognitionInput!): Recognition!
+}
+
+type Subscription {
+  # Get notified when someone recognizes me
+  recognitionReceived(userId: ID!): Recognition!
+  
+  # See new public recognitions as they happen
+  recognitionCreated: Recognition!
+}
